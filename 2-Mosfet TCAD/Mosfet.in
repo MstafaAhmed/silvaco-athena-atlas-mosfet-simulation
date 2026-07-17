@@ -1,0 +1,83 @@
+go athena
+line x loc=0.00 spac=0.10
+line x loc=0.20 spac=0.005
+line x loc=0.4 spac=0.005
+line x loc=0.6 spac=0.05
+line y loc=0.0 spac=0.010
+line y loc=0.2 spac=0.05
+line y loc=0.3 spac=0.05
+line y loc=0.8 spac=0.05
+# substrate
+init silicon c.boron=1.0e15 orientation=100 two.d
+# field oxide (dry O2)
+diffus time=250 minutes temp=1250 dryo2
+# strip field oxide
+etch oxide all
+# gate oxide (dry O2)
+diffus time=50 minutes temp=1000 dryo2
+# poly gate deposition
+deposit polysilicon thick=0.2 divisions=10
+# define poly gate edge
+etch polysilicon left p1.x=0.35
+# poly reoxidation
+diffus time=10 minutes temp=1000 dryo2
+# source/drain implant (single statement, no orphaned continuation)
+implant arsenic dose=5.0e14 energy=50 tilt=0 rotation=0 crystal
+# open contact windows
+etch oxide left p1.x=0.2
+etch oxide above p1.y=0.005
+# metal deposition
+deposit aluminum thick=0.05 divisions=10
+# define source metal edge
+etch aluminum right p1.x=0.1
+#
+struct mirror right
+#
+# after mirroring about x=0.6:
+#   source metal ~ x=0.0  -> 0.1   (untouched, left of mirror line)
+#   poly gate    ~ x=0.35 -> 0.85  (straddles mirror line)
+#   drain metal  ~ x=1.1  -> 1.2   (mirrored copy of source metal)
+# verify exact numbers in TonyPlot before trusting these electrode picks
+electrode name=source x=0.05
+electrode name=gate   x=0.50
+electrode name=drain  x=1.15
+#
+struct outfile=mosfet.str
+tonyplot mosfet.str
+
+go atlas
+#
+contact name=gate n.poly
+#
+interface qf=3e10
+models cvt boltzmann print numcarr=2 temperature=300
+#
+method newton itlimit=25 trap atrap=0.5 maxtrap=4 autonr nrcriterion=0.1 tol.time=5e-3 dt.min=1e-25
+#
+solve init
+solve vgate=1 outf=solve_tem1
+solve vgate=2 outf=solve_tem2
+solve vgate=5 outf=solve_tem3
+#
+load infile=solve_tem1
+log outf=mosfet1.log
+solve name=drain vdrain=0 vfinal=3.3 vstep=0.3
+extract init infile="mosfet1.log"
+extract name="idvd_vg1" curve(v."drain", i."drain") outfile="idvd_vg1.dat"
+
+load infile=solve_tem2
+log outf=mosfet2.log
+solve name=drain vdrain=0 vfinal=3.3 vstep=0.3
+extract init infile="mosfet2.log"
+extract name="idvd_vg2" curve(v."drain", i."drain") outfile="idvd_vg2.dat"
+
+
+load infile=solve_tem3
+log outf=mosfet3.log
+solve name=drain vdrain=0 vfinal=3.3 vstep=0.3
+extract init infile="mosfet3.log"
+extract name="idvd_vg3" curve(v."drain", i."drain") outfile="idvd_vg3.dat"
+tonyplot -overlay mosfet1.log mosfet2.log mosfet3.log
+
+
+quit
